@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCAA Schedule</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4f8; color: #1a202c; min-height: 100vh; }
+
+  /* ===== SETUP OVERLAY ===== */
+  .setup-overlay {
+    position: fixed; inset: 0;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  .setup-overlay.hidden { display: none; }
+  .setup-box {
+    background: white; border-radius: 18px; padding: 44px 52px;
+    max-width: 500px; width: 94%; text-align: center;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+  }
+  .setup-logo {
+    width: 60px; height: 60px; background: linear-gradient(135deg,#1e3a5f,#2d6a9f);
+    border-radius: 14px; margin: 0 auto 18px; display: flex; align-items: center;
+    justify-content: center; font-size: 1.8rem; color: white;
+  }
+  .setup-box h1 { font-size: 1.7rem; color: #1e3a5f; margin-bottom: 10px; }
+  .setup-box .tagline {
+    color: #718096; font-size: 0.92rem; line-height: 1.65; margin-bottom: 24px;
+  }
+  .setup-path {
+    background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 10px 14px; font-family: monospace; font-size: 0.82rem;
+    color: #4a5568; margin-bottom: 22px; text-align: left; word-break: break-all;
+  }
+  .setup-btn {
+    background: #1e3a5f; color: white; border: none; border-radius: 10px;
+    padding: 13px 0; font-size: 0.95rem; font-weight: 700;
+    cursor: pointer; width: 100%; transition: background 0.15s; margin-bottom: 10px;
+  }
+  .setup-btn:hover { background: #2d6a9f; }
+  .setup-btn.secondary {
+    background: #edf2f7; color: #4a5568; font-weight: 600;
+    border: 1px solid #e2e8f0; margin-bottom: 0;
+  }
+  .setup-btn.secondary:hover { background: #e2e8f0; }
+  .setup-note { margin-top: 16px; font-size: 0.78rem; color: #a0aec0; line-height: 1.5; }
+  .compat-error {
+    background: #fff5f5; border: 1px solid #fc8181; border-radius: 8px;
+    padding: 14px 16px; color: #c53030; font-size: 0.87rem;
+    margin-top: 18px; display: none; text-align: left; line-height: 1.5;
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
+    color: white; padding: 14px 26px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: 0.4px; white-space: nowrap; }
+  .header-folder {
+    font-size: 0.72rem; opacity: 0.55; margin-left: 2px;
+    max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .header-spacer { flex: 1; }
+  .hdr-btn {
+    background: rgba(255,255,255,0.13); border: 1px solid rgba(255,255,255,0.35);
+    color: white; padding: 7px 14px; border-radius: 7px; cursor: pointer;
+    font-size: 0.8rem; font-weight: 600; transition: all 0.15s; white-space: nowrap;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .hdr-btn:hover { background: rgba(255,255,255,0.25); }
+  .hdr-btn.accent { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.5); }
+  .hdr-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .spin { display: inline-block; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== LAYOUT ===== */
+  .app-layout { display: flex; min-height: calc(100vh - 57px); }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: 288px; min-width: 268px; background: white;
+    border-right: 1px solid #e2e8f0; padding: 18px;
+    display: flex; flex-direction: column; gap: 14px;
+    box-shadow: 2px 0 6px rgba(0,0,0,0.05);
+  }
+  .calendar-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+  }
+  .calendar-header .month-year { font-weight: 700; font-size: 0.93rem; color: #1e3a5f; }
+  .cal-nav-btn {
+    background: none; border: 1px solid #cbd5e0; border-radius: 6px;
+    cursor: pointer; padding: 3px 9px; font-size: 1rem; color: #4a5568; transition: all 0.15s;
+  }
+  .cal-nav-btn:hover { background: #ebf4ff; border-color: #2d6a9f; color: #2d6a9f; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+  .cal-dow {
+    text-align: center; font-size: 0.64rem; font-weight: 600;
+    color: #718096; padding: 3px 0; text-transform: uppercase;
+  }
+  .cal-day {
+    text-align: center; padding: 5px 1px; border-radius: 5px; font-size: 0.79rem;
+    cursor: pointer; transition: all 0.15s; border: 1px solid transparent;
+    color: #4a5568; line-height: 1;
+  }
+  .cal-day:hover:not(.cal-empty):not(.cal-no-data) { background: #ebf4ff; border-color: #2d6a9f; }
+  .cal-day.cal-empty { cursor: default; }
+  .cal-day.cal-no-data { color: #cbd5e0; cursor: default; }
+  .cal-day.cal-has-data { color: #1a202c; font-weight: 500; }
+  .cal-day.cal-today { background: #ebf4ff; border-color: #2d6a9f; color: #2d6a9f; font-weight: 700; }
+  .cal-day.cal-selected { background: #1e3a5f !important; color: white !important; font-weight: 700; border-color: #1e3a5f; }
+  .cal-day.cal-weekend.cal-has-data { color: #718096; }
+
+  .sidebar-section { border-top: 1px solid #e2e8f0; padding-top: 12px; }
+  .sidebar-label {
+    font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.5px;
+    color: #a0aec0; font-weight: 600; margin-bottom: 7px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 0.78rem; margin-bottom: 4px; color: #4a5568; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  .file-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+    padding: 5px 9px; margin-bottom: 4px; font-size: 0.76rem; color: #4a5568;
+  }
+  .file-chip .file-icon { color: #38a169; font-size: 0.85rem; }
+  .file-chip .file-count { margin-left: auto; color: #a0aec0; font-size: 0.72rem; }
+
+  /* ===== MAIN CONTENT ===== */
+  .main-content { flex: 1; padding: 22px 26px; overflow-y: auto; }
+  .date-heading { font-size: 1.25rem; font-weight: 700; color: #1e3a5f; margin-bottom: 16px; }
+
+  .state-card {
+    background: white; border-radius: 12px; padding: 48px 32px;
+    text-align: center; color: #718096; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    max-width: 520px;
+  }
+  .state-icon { font-size: 2.6rem; margin-bottom: 14px; }
+  .state-card p { font-size: 0.92rem; line-height: 1.65; margin-bottom: 6px; }
+  .state-card strong { color: #4a5568; }
+  .state-action {
+    display: inline-block; margin-top: 18px;
+    background: #1e3a5f; color: white; border: none; border-radius: 8px;
+    padding: 10px 24px; font-size: 0.87rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .state-action:hover { background: #2d6a9f; }
+
+  /* ===== SCHEDULE CARDS ===== */
+  .schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .schedule-grid .full-width { grid-column: 1 / -1; }
+  .section-card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; }
+  .section-header {
+    padding: 10px 14px; font-weight: 700; font-size: 0.8rem;
+    text-transform: uppercase; letter-spacing: 0.8px; color: white;
+  }
+  .section-body { padding: 10px 14px; }
+  .hdr-regions  { background: linear-gradient(90deg,#1e3a5f,#2d6a9f); }
+  .hdr-eastgate { background: linear-gradient(90deg,#276749,#38a169); }
+  .hdr-tria     { background: linear-gradient(90deg,#702459,#b83280); }
+  .hdr-lakeview { background: linear-gradient(90deg,#744210,#d69e2e); }
+  .hdr-admin    { background: linear-gradient(90deg,#44337a,#805ad5); }
+  .hdr-vacation { background: linear-gradient(90deg,#2c5282,#4299e1); }
+
+  .supervisor-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .supervisor-badge {
+    display: flex; flex-direction: column; align-items: center;
+    border-radius: 8px; padding: 7px 10px; flex: 1; min-width: 72px;
+  }
+  .supervisor-badge .role {
+    font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;
+    font-weight: 600; margin-bottom: 3px;
+  }
+  .supervisor-badge .name { font-size: 0.83rem; font-weight: 700; }
+  .supervisor-badge.first  { background: #fff5f5; border: 1px solid #feb2b2; }
+  .supervisor-badge.first  .role { color: #e53e3e; }
+  .supervisor-badge.first  .name { color: #c53030; }
+  .supervisor-badge.second { background: #fffaf0; border: 1px solid #fbd38d; }
+  .supervisor-badge.second .role { color: #d69e2e; }
+  .supervisor-badge.second .name { color: #b7791f; }
+  .supervisor-badge.third  { background: #f0fff4; border: 1px solid #9ae6b4; }
+  .supervisor-badge.third  .role { color: #38a169; }
+  .supervisor-badge.third  .name { color: #276749; }
+
+  .staff-label { font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.5px; color: #a0aec0; font-weight: 600; margin-bottom: 5px; }
+  .staff-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 5px; }
+  .staff-chip {
+    background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+    padding: 4px 4px; text-align: center; font-size: 0.75rem; color: #2d3748; font-weight: 500;
+  }
+  .staff-chip.empty { color: #cbd5e0; font-style: italic; font-weight: 400; }
+
+  .role-list { display: flex; flex-direction: column; gap: 5px; }
+  .role-item { display: flex; align-items: center; gap: 8px; padding: 5px 7px; border-radius: 6px; background: #f7fafc; }
+  .role-item .role-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; min-width: 56px; color: #718096; }
+  .role-item .role-name { font-size: 0.83rem; font-weight: 600; color: #2d3748; }
+  .role-item .role-name.empty { color: #cbd5e0; font-style: italic; font-weight: 400; }
+
+  .vac-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+  .vac-chip { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 20px; padding: 3px 11px; font-size: 0.77rem; color: #2b6cb0; font-weight: 500; }
+  .empty-section { color: #a0aec0; font-style: italic; font-size: 0.82rem; padding: 4px 0; }
+
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed; bottom: 22px; right: 22px;
+    background: #276749; color: white; padding: 11px 18px; border-radius: 10px;
+    font-size: 0.84rem; font-weight: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    transform: translateY(80px); opacity: 0; transition: all 0.3s; z-index: 3000;
+    pointer-events: none; max-width: 360px;
+  }
+  .toast.error-toast { background: #c53030; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  @media (max-width: 800px) {
+    .app-layout { flex-direction: column; }
+    .sidebar { width: 100%; min-width: unset; border-right: none; border-bottom: 1px solid #e2e8f0; }
+    .schedule-grid { grid-template-columns: 1fr; }
+    .schedule-grid .full-width { grid-column: 1; }
+    .setup-box { padding: 30px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== FIRST-RUN / RESTORE OVERLAY ===== -->
+<div id="setupOverlay" class="setup-overlay hidden">
+  <div class="setup-box">
+    <div class="setup-logo">&#128197;</div>
+    <h1>TCAA Schedule</h1>
+    <p class="tagline" id="setupTagline">
+      Select your <strong>ExcelSchedules</strong> folder. The app will read all
+      .xls files from it automatically every time this page loads.
+    </p>
+    <div class="setup-path" id="setupPath">
+      Dropbox\Claude\TCAA Schedule\ExcelSchedules\
+    </div>
+    <button class="setup-btn" id="setupPrimaryBtn" onclick="selectFolder()">
+      &#128194; Select ExcelSchedules Folder
+    </button>
+    <button class="setup-btn secondary" id="setupSecondaryBtn" style="display:none" onclick="selectFolder()">
+      &#128194; Select a Different Folder
+    </button>
+    <p class="setup-note" id="setupNote">
+      You'll be asked to grant access once. Your browser remembers the folder across page refreshes.
+    </p>
+    <div class="compat-error" id="compatError">
+      <strong>Browser not supported.</strong><br>
+      The File System Access API requires <strong>Chrome</strong> or <strong>Edge</strong>.
+      Please open this file in one of those browsers.
+    </div>
+  </div>
+</div>
+
+<!-- ===== HEADER ===== -->
+<header>
+  <div>
+    <h1>TCAA Schedule</h1>
+    <div class="header-folder" id="headerFolderName"></div>
+  </div>
+  <div class="header-spacer"></div>
+  <button class="hdr-btn" id="refreshBtn" onclick="refreshSchedules()" title="Re-read all .xls files from the ExcelSchedules folder">
+    <span id="refreshIcon">&#8635;</span> Refresh
+  </button>
+  <button class="hdr-btn accent" onclick="uploadSchedule()" title="Add a new .xls schedule file to the ExcelSchedules folder">
+    &#43; Upload Schedule
+  </button>
+  <button class="hdr-btn" onclick="changeFolder()" title="Select a different folder">
+    &#128194; Change Folder
+  </button>
+</header>
+
+<!-- ===== APP LAYOUT ===== -->
+<div class="app-layout">
+  <div class="sidebar">
+
+    <!-- Calendar -->
+    <div>
+      <div class="calendar-header">
+        <button class="cal-nav-btn" onclick="prevMonth()">&#8249;</button>
+        <span class="month-year" id="monthYearLabel"></span>
+        <button class="cal-nav-btn" onclick="nextMonth()">&#8250;</button>
+      </div>
+      <div class="calendar-grid" id="calGrid"></div>
+    </div>
+
+    <!-- Legend -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Sections</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2d6a9f"></div>Regions</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#38a169"></div>Eastgate</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#b83280"></div>TRIA</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d69e2e"></div>Lakeview</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#805ad5"></div>Admin</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4299e1"></div>Vacation / Non-Clinical</div>
+    </div>
+
+    <!-- Loaded files list -->
+    <div class="sidebar-section" id="filesPanel" style="display:none">
+      <div class="sidebar-label">Loaded Files</div>
+      <div id="filesList"></div>
+    </div>
+
+  </div>
+
+  <!-- Main content -->
+  <div class="main-content" id="mainContent">
+    <div class="date-heading" id="dateHeading"></div>
+    <div id="scheduleDisplay">
+      <div class="state-card">
+        <div class="state-icon">&#128197;</div>
+        <p>Initializing&hellip;</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastMsg"></div>
+
+<script>
+'use strict';
+
+// =====================================================
+// IndexedDB — persist the folder handle across sessions
+// =====================================================
+var IDB_NAME  = 'TCAAScheduleDB';
+var IDB_STORE = 'handles';
+var IDB_KEY   = 'scheduleFolder';
+
+function idbOpen() {
+  return new Promise(function(res, rej) {
+    var req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = function(e) { e.target.result.createObjectStore(IDB_STORE); };
+    req.onsuccess  = function(e) { res(e.target.result); };
+    req.onerror    = function(e) { rej(e.target.error); };
+  });
+}
+function idbSave(handle) {
+  return idbOpen().then(function(db) {
+    return new Promise(function(res, rej) {
+      var tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(handle, IDB_KEY);
+      tx.oncomplete = res;
+      tx.onerror = function(e) { rej(e.target.error); };
+    });
+  });
+}
+function idbLoad() {
+  return idbOpen().then(function(db) {
+    return new Promise(function(res, rej) {
+      var tx = db.transaction(IDB_STORE, 'readonly');
+      var req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+      req.onsuccess = function(e) { res(e.target.result || null); };
+      req.onerror   = function(e) { rej(e.target.error); };
+    });
+  });
+}
+function idbClear() {
+  return idbOpen().then(function(db) {
+    return new Promise(function(res, rej) {
+      var tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(IDB_KEY);
+      tx.oncomplete = res;
+      tx.onerror = function(e) { rej(e.target.error); };
+    });
+  });
+}
+
+// =====================================================
+// SheetJS — lazy load from CDN only when needed
+// =====================================================
+var xlsxReady = false;
+function ensureXLSX() {
+  if (xlsxReady || typeof XLSX !== 'undefined') { xlsxReady = true; return Promise.resolve(); }
+  return new Promise(function(res, rej) {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.onload  = function() { xlsxReady = true; res(); };
+    s.onerror = function() { rej(new Error('Failed to load the Excel parsing library. Check your internet connection.')); };
+    document.head.appendChild(s);
+  });
+}
+
+// =====================================================
+// App state
+// =====================================================
+var folderHandle = null;
+var scheduleData = {};
+var loadedFiles  = [];
+
+var viewYear   = new Date().getFullYear();
+var viewMonth  = new Date().getMonth();
+var selectedDate = null;
+
+var DOW    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var MONTHS = ['January','February','March','April','May','June',
+              'July','August','September','October','November','December'];
+var MONTH_MAP = {
+  Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',
+  Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'
+};
+
+// =====================================================
+// Folder management
+// =====================================================
+function showSetupOverlay(restoreMode, folderName) {
+  var ov   = document.getElementById('setupOverlay');
+  var tag  = document.getElementById('setupTagline');
+  var path = document.getElementById('setupPath');
+  var pri  = document.getElementById('setupPrimaryBtn');
+  var sec  = document.getElementById('setupSecondaryBtn');
+  var note = document.getElementById('setupNote');
+  var comp = document.getElementById('compatError');
+
+  if (!window.showDirectoryPicker) {
+    comp.style.display = 'block';
+    pri.disabled = true;
+  } else if (restoreMode && folderName) {
+    tag.innerHTML = 'Click below to restore access to <strong>' + folderName +
+      '</strong>. Your browser needs confirmation before reading files again.';
+    path.textContent = folderName;
+    pri.textContent  = '\uD83D\uDCC2 Restore Access to "' + folderName + '"';
+    pri.onclick      = restoreAccess;
+    sec.style.display = 'block';
+    sec.onclick      = selectFolder;
+    note.textContent = 'You may need to do this once per browser session.';
+  } else {
+    pri.textContent = '\uD83D\uDCC2 Select ExcelSchedules Folder';
+    pri.onclick = selectFolder;
+    sec.style.display = 'none';
+  }
+
+  ov.classList.remove('hidden');
+}
+
+function hideSetupOverlay() {
+  document.getElementById('setupOverlay').classList.add('hidden');
+}
+
+function selectFolder() {
+  if (!window.showDirectoryPicker) {
+    alert('Please open this file in Chrome or Edge.');
+    return;
+  }
+  window.showDirectoryPicker({ mode: 'readwrite', id: 'tcaaSchedules' })
+    .then(function(handle) {
+      folderHandle = handle;
+      document.getElementById('headerFolderName').textContent = handle.name;
+      return idbSave(handle);
+    })
+    .then(function() {
+      hideSetupOverlay();
+      return refreshSchedules();
+    })
+    .catch(function(e) {
+      if (e.name !== 'AbortError') showToast('Could not access folder: ' + e.message, true);
+    });
+}
+
+function restoreAccess() {
+  if (!folderHandle) { selectFolder(); return; }
+  folderHandle.requestPermission({ mode: 'readwrite' })
+    .then(function(state) {
+      if (state === 'granted') {
+        hideSetupOverlay();
+        document.getElementById('headerFolderName').textContent = folderHandle.name;
+        return refreshSchedules();
+      } else {
+        selectFolder();
+      }
+    })
+    .catch(function() { selectFolder(); });
+}
+
+function changeFolder() {
+  idbClear().then(selectFolder);
+}
+
+// =====================================================
+// Read all XLS files from the folder & parse them
+// =====================================================
+function setRefreshBusy(busy) {
+  var btn  = document.getElementById('refreshBtn');
+  var icon = document.getElementById('refreshIcon');
+  btn.disabled = busy;
+  icon.className = busy ? 'spin' : '';
+  icon.textContent = busy ? '\u21BB' : '\u21BB';
+}
+
+function refreshSchedules() {
+  if (!folderHandle) { showSetupOverlay(false); return Promise.resolve(); }
+
+  setRefreshBusy(true);
+  scheduleData = {};
+  loadedFiles  = [];
+
+  // Collect all .xls / .xlsx entries
+  var fileEntries = [];
+
+  function collectEntries(iter) {
+    return iter.next().then(function(result) {
+      if (result.done) return;
+      var name   = result.value[0];
+      var handle = result.value[1];
+      if (handle.kind === 'file' && /\.(xls|xlsx)$/i.test(name)) {
+        fileEntries.push({ name: name, handle: handle });
+      }
+      return collectEntries(iter);
+    });
+  }
+
+  return collectEntries(folderHandle.entries())
+    .then(function() {
+      if (fileEntries.length === 0) {
+        setRefreshBusy(false);
+        showNoFiles();
+        return;
+      }
+      return ensureXLSX().then(function() {
+        var promises = fileEntries.map(function(entry) {
+          return entry.handle.getFile()
+            .then(function(file) { return file.arrayBuffer(); })
+            .then(function(buf) {
+              try {
+                var wb   = XLSX.read(buf, { type: 'array', cellDates: true });
+                var ws   = wb.Sheets[wb.SheetNames[0]];
+                var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                var entries = parseRows(rows);
+                var count   = Object.keys(entries).length;
+                if (count > 0) {
+                  Object.assign(scheduleData, entries);
+                  loadedFiles.push({ name: entry.name, count: count });
+                } else {
+                  loadedFiles.push({ name: entry.name, count: 0, warn: true });
+                }
+              } catch(e) {
+                console.warn('Could not parse ' + entry.name + ':', e);
+                loadedFiles.push({ name: entry.name, count: 0, warn: true });
+              }
+            });
+        });
+        return Promise.all(promises);
+      });
+    })
+    .then(function() {
+      setRefreshBusy(false);
+      updateFilesPanel();
+      renderApp();
+    })
+    .catch(function(e) {
+      setRefreshBusy(false);
+      showToast('Error reading files: ' + e.message, true);
+    });
+}
+
+// =====================================================
+// Upload: copy a file into the ExcelSchedules folder
+// =====================================================
+function uploadSchedule() {
+  if (!folderHandle) { showSetupOverlay(false); return; }
+  if (!window.showOpenFilePicker) {
+    alert('Please open this file in Chrome or Edge.');
+    return;
+  }
+  window.showOpenFilePicker({
+    types: [{ description: 'Excel Schedule Files', accept: { 'application/vnd.ms-excel': ['.xls', '.xlsx'] } }],
+    multiple: false
+  })
+  .then(function(handles) {
+    return handles[0].getFile().then(function(file) {
+      return file.arrayBuffer().then(function(buf) {
+        return folderHandle.getFileHandle(file.name, { create: true })
+          .then(function(newHandle) {
+            return newHandle.createWritable()
+              .then(function(writable) {
+                return writable.write(buf).then(function() { return writable.close(); });
+              });
+          })
+          .then(function() {
+            showToast('"' + file.name + '" uploaded — refreshing...');
+            return refreshSchedules();
+          });
+      });
+    });
+  })
+  .catch(function(e) {
+    if (e.name !== 'AbortError') showToast('Upload failed: ' + e.message, true);
+  });
+}
+
+// =====================================================
+// Parse XLS rows → scheduleData entries
+// =====================================================
+function parseRows(rows) {
+  var year    = detectYear(rows);
+  var dateRow = rows[1] || [];
+  var entries = {};
+
+  for (var col = 4; col < dateRow.length; col++) {
+    var iso = parseExcelDate(dateRow[col], year);
+    if (!iso) continue;
+
+    (function(c) {
+      function gc(r) {
+        var row = rows[r];
+        if (!row) return '';
+        var v = row[c];
+        return v ? String(v).trim() : '';
+      }
+      var staff = [];
+      for (var r = 5; r <= 14; r++) staff.push(gc(r));
+      var vac = [];
+      for (var r = 26; r <= 34; r++) { var v = gc(r); if (v) vac.push(v); }
+
+      entries[iso] = {
+        regions:  { First: gc(2), Second: gc(3), Third: gc(4), staff: staff },
+        eastgate: { E1: gc(15), E2: gc(16), E3GI: gc(17) },
+        tria:     { '1': gc(18) },
+        lakeview: { Call: gc(19), '1': gc(20), '2': gc(21), PostCall: gc(22) },
+        admin:    { '1': gc(23), '2': gc(24), '3': gc(25) },
+        vacation: vac
+      };
+    })(col);
+  }
+  return entries;
+}
+
+function detectYear(rows) {
+  var dateRow = rows[1] || [];
+  for (var ci = 4; ci < Math.min(dateRow.length, 25); ci++) {
+    var v = dateRow[ci];
+    if (v instanceof Date) { var y = v.getFullYear(); if (y >= 2020 && y <= 2040) return y; }
+    if (typeof v === 'string') {
+      var mdy = v.match(/(\d{4})/); if (mdy) { var yr = parseInt(mdy[1]); if (yr >= 2020 && yr <= 2040) return yr; }
+    }
+    if (typeof v === 'number') { var n = Math.round(v); if (n >= 2020 && n <= 2040) return n; }
+  }
+  // Check rows 0-1 first few cols for a year number
+  for (var ri = 0; ri <= 1; ri++) {
+    var row = rows[ri]; if (!row) continue;
+    for (var ci2 = 0; ci2 < Math.min(row.length, 8); ci2++) {
+      var v2 = row[ci2];
+      if (v2 instanceof Date) { var y2 = v2.getFullYear(); if (y2 >= 2020 && y2 <= 2040) return y2; }
+      if (typeof v2 === 'number') { var n2 = Math.round(v2); if (n2 >= 2020 && n2 <= 2040) return n2; }
+      if (typeof v2 === 'string') { var h2 = v2.match(/\b(20[2-9]\d)\b/); if (h2) return parseInt(h2[1]); }
+    }
+  }
+  return new Date().getFullYear();
+}
+
+function parseExcelDate(val, year) {
+  if (val === null || val === undefined || val === '') return null;
+
+  // JS Date object (cellDates: true — most reliable)
+  if (val instanceof Date) {
+    var y = val.getFullYear(), m = val.getMonth() + 1, d = val.getDate();
+    if (y >= 2020 && y <= 2040)
+      return y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    return null;
+  }
+
+  if (typeof val === 'string') {
+    var s = val.trim();
+    // m/d/yyyy or m-d-yyyy
+    var mdy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (mdy)
+      return mdy[3] + '-' + String(parseInt(mdy[1])).padStart(2,'0') + '-' + String(parseInt(mdy[2])).padStart(2,'0');
+    // "6-Apr" with detected year
+    var parts = s.split('-');
+    if (parts.length === 2) {
+      var mon = MONTH_MAP[parts[1].trim()];
+      if (mon && year) return year + '-' + mon + '-' + String(parseInt(parts[0])).padStart(2,'0');
+    }
+    return null;
+  }
+
+  // Raw serial number fallback
+  if (typeof val === 'number') {
+    try {
+      var dt = XLSX.SSF.parse_date_code(val);
+      if (dt && dt.y >= 2020 && dt.y <= 2040)
+        return dt.y + '-' + String(dt.m).padStart(2,'0') + '-' + String(dt.d).padStart(2,'0');
+    } catch(e) {}
+  }
+  return null;
+}
+
+// =====================================================
+// Calendar rendering
+// =====================================================
+function toIso(y, m, d) {
+  return y + '-' + String(m + 1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+}
+function getToday() {
+  var t = new Date();
+  return toIso(t.getFullYear(), t.getMonth(), t.getDate());
+}
+function formatDateFull(iso) {
+  var parts = iso.split('-').map(Number);
+  return new Date(parts[0], parts[1]-1, parts[2])
+    .toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+}
+
+function renderCalendar() {
+  document.getElementById('monthYearLabel').textContent = MONTHS[viewMonth] + ' ' + viewYear;
+  var grid  = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  DOW.forEach(function(d) {
+    var el = document.createElement('div');
+    el.className = 'cal-dow'; el.textContent = d; grid.appendChild(el);
+  });
+
+  var firstDay    = new Date(viewYear, viewMonth, 1).getDay();
+  var daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  var today       = getToday();
+
+  for (var i = 0; i < firstDay; i++) {
+    var blank = document.createElement('div'); blank.className = 'cal-day cal-empty'; grid.appendChild(blank);
+  }
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var iso = toIso(viewYear, viewMonth, d);
+    var el  = document.createElement('div');
+    var dow = (firstDay + d - 1) % 7;
+    var hasData  = !!scheduleData[iso];
+    var isWeekend = (dow === 0 || dow === 6);
+
+    var cls = 'cal-day';
+    cls += hasData ? ' cal-has-data' : ' cal-no-data';
+    if (isWeekend) cls += ' cal-weekend';
+    if (iso === today)        cls += ' cal-today';
+    if (iso === selectedDate) cls += ' cal-selected';
+
+    el.className = cls;
+    el.textContent = d;
+    if (hasData) {
+      (function(date) { el.onclick = function() { selectDate(date); }; })(iso);
+      el.title = formatDateFull(iso);
+    }
+    grid.appendChild(el);
+  }
+}
+
+function prevMonth() { viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } renderCalendar(); }
+function nextMonth() { viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } renderCalendar(); }
+
+function selectDate(iso) {
+  selectedDate = iso;
+  var parts = iso.split('-').map(Number);
+  viewYear  = parts[0];
+  viewMonth = parts[1] - 1;
+  renderCalendar();
+  renderSchedule(iso);
+}
+
+// =====================================================
+// Schedule rendering
+// =====================================================
+function renderApp() {
+  var keys = Object.keys(scheduleData);
+  if (keys.length === 0) {
+    showNoFiles();
+    return;
+  }
+
+  var today = getToday();
+  if (scheduleData[today]) {
+    selectedDate = today;
+  } else {
+    // Find nearest date
+    keys.sort();
+    var nearest = keys[0];
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i] >= today) { nearest = keys[i]; break; }
+    }
+    selectedDate = nearest;
+  }
+
+  var parts = selectedDate.split('-').map(Number);
+  viewYear  = parts[0];
+  viewMonth = parts[1] - 1;
+  renderCalendar();
+  renderSchedule(selectedDate);
+}
+
+function renderSchedule(iso) {
+  var heading = document.getElementById('dateHeading');
+  var display = document.getElementById('scheduleDisplay');
+  var data    = scheduleData[iso];
+
+  if (!data) {
+    heading.textContent = formatDateFull(iso);
+    display.innerHTML = '<div class="state-card"><div class="state-icon">&#128197;</div>' +
+      '<p>No schedule data for this date.</p></div>';
+    return;
+  }
+
+  heading.textContent = formatDateFull(iso);
+
+  var html = '<div class="schedule-grid">';
+
+  // REGIONS
+  var reg = data.regions;
+  html += '<div class="section-card full-width">';
+  html += '<div class="section-header hdr-regions">Regions</div>';
+  html += '<div class="section-body">';
+  html += '<div class="supervisor-row">';
+  html += supBadge('First',       reg.First,  'first');
+  html += supBadge('Second',      reg.Second, 'second');
+  html += supBadge('Third / Days',reg.Third,  'third');
+  html += '</div>';
+  html += '<div class="staff-label">Staff</div><div class="staff-grid">';
+  for (var i = 0; i < 10; i++) {
+    var nm = (reg.staff && reg.staff[i]) ? reg.staff[i].trim() : '';
+    html += nm ? '<div class="staff-chip">' + esc(nm) + '</div>'
+               : '<div class="staff-chip empty">&mdash;</div>';
+  }
+  html += '</div></div></div>';
+
+  // EASTGATE
+  var eg = data.eastgate;
+  html += '<div class="section-card">';
+  html += '<div class="section-header hdr-eastgate">Eastgate</div>';
+  html += '<div class="section-body"><div class="role-list">';
+  html += roleRow('E1',     eg.E1);
+  html += roleRow('E2',     eg.E2);
+  html += roleRow('E3 / GI',eg.E3GI);
+  html += '</div></div></div>';
+
+  // TRIA
+  html += '<div class="section-card">';
+  html += '<div class="section-header hdr-tria">TRIA</div>';
+  html += '<div class="section-body"><div class="role-list">';
+  html += roleRow('1', data.tria['1']);
+  html += '</div></div></div>';
+
+  // LAKEVIEW
+  var lk = data.lakeview;
+  html += '<div class="section-card">';
+  html += '<div class="section-header hdr-lakeview">Lakeview</div>';
+  html += '<div class="section-body"><div class="role-list">';
+  html += roleRow('Call',      lk.Call);
+  html += roleRow('1',         lk['1']);
+  html += roleRow('2',         lk['2']);
+  html += roleRow('Post-Call', lk.PostCall);
+  html += '</div></div></div>';
+
+  // ADMIN
+  var adm = data.admin;
+  html += '<div class="section-card">';
+  html += '<div class="section-header hdr-admin">Admin</div>';
+  html += '<div class="section-body"><div class="role-list">';
+  html += roleRow('1', adm['1']);
+  html += roleRow('2', adm['2']);
+  html += roleRow('3', adm['3']);
+  html += '</div></div></div>';
+
+  // VACATION
+  var vac = data.vacation;
+  html += '<div class="section-card full-width">';
+  html += '<div class="section-header hdr-vacation">Vacation &amp; Non-Clinical</div>';
+  html += '<div class="section-body">';
+  if (vac && vac.length > 0) {
+    html += '<div class="vac-grid">';
+    vac.forEach(function(n) { if (n && n.trim()) html += '<div class="vac-chip">' + esc(n.trim()) + '</div>'; });
+    html += '</div>';
+  } else {
+    html += '<div class="empty-section">No vacation / non-clinical assignments</div>';
+  }
+  html += '</div></div>';
+
+  html += '</div>';
+  display.innerHTML = html;
+}
+
+function supBadge(role, personName, cls) {
+  var n = (personName || '').trim();
+  return '<div class="supervisor-badge ' + cls + '">' +
+    '<span class="role">' + role + '</span>' +
+    '<span class="name">' + (n ? esc(n) : '&mdash;') + '</span>' +
+    '</div>';
+}
+function roleRow(label, personName) {
+  var n = (personName || '').trim();
+  return '<div class="role-item">' +
+    '<span class="role-label">' + label + '</span>' +
+    '<span class="role-name' + (n ? '' : ' empty') + '">' + (n ? esc(n) : '&mdash;') + '</span>' +
+    '</div>';
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// =====================================================
+// State screens
+// =====================================================
+function showNoFiles() {
+  var folderName = folderHandle ? folderHandle.name : 'ExcelSchedules';
+  document.getElementById('dateHeading').textContent = '';
+  document.getElementById('scheduleDisplay').innerHTML =
+    '<div class="state-card">' +
+    '<div class="state-icon">&#128193;</div>' +
+    '<p>No schedule files found in <strong>' + esc(folderName) + '</strong>.</p>' +
+    '<p>Click <strong>+ Upload Schedule</strong> to add an .xls file,<br>or place files in the folder and click <strong>Refresh</strong>.</p>' +
+    '</div>';
+  renderCalendar();
+}
+
+function updateFilesPanel() {
+  var panel = document.getElementById('filesPanel');
+  var list  = document.getElementById('filesList');
+  if (loadedFiles.length === 0) { panel.style.display = 'none'; list.innerHTML = ''; return; }
+  panel.style.display = 'block';
+  list.innerHTML = loadedFiles.map(function(f) {
+    var icon  = f.warn ? '&#9888;' : '&#10003;';
+    var color = f.warn ? '#d69e2e' : '#38a169';
+    return '<div class="file-chip">' +
+      '<span class="file-icon" style="color:' + color + '">' + icon + '</span>' +
+      '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(f.name) + '</span>' +
+      (f.count > 0 ? '<span class="file-count">' + f.count + 'd</span>' : '') +
+    '</div>';
+  }).join('');
+}
+
+// =====================================================
+// Toast
+// =====================================================
+var toastTimer = null;
+function showToast(msg, isError) {
+  var t = document.getElementById('toastMsg');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error-toast' : '') + ' show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.classList.remove('show'); }, 3800);
+}
+
+// =====================================================
+// Init
+// =====================================================
+(function init() {
+  if (!window.showDirectoryPicker) {
+    showSetupOverlay(false);
+    return;
+  }
+
+  idbLoad()
+    .then(function(saved) {
+      if (!saved) { showSetupOverlay(false); return; }
+
+      // Check if permission is already granted (no user gesture needed)
+      return saved.queryPermission({ mode: 'readwrite' })
+        .then(function(state) {
+          if (state === 'granted') {
+            folderHandle = saved;
+            document.getElementById('headerFolderName').textContent = saved.name;
+            hideSetupOverlay();
+            return refreshSchedules();
+          } else {
+            // Need the user to click — show restore prompt
+            folderHandle = saved;
+            showSetupOverlay(true, saved.name);
+          }
+        });
+    })
+    .catch(function() {
+      showSetupOverlay(false);
+    });
+
+  // Render an empty calendar in the background while loading
+  renderCalendar();
+})();
+</script>
+</body>
+</html>
